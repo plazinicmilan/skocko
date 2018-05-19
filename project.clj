@@ -3,5 +3,10 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.6.0"] [org.clojure/tools.logging "0.3.1"] [ring/ring "1.3.1"]]
-  :main skocko.core)
+  :dependencies [[org.clojure/clojure "1.8.0"]  [ring "1.4.0"]
+                ]
+
+:main skocko.core
+  :profiles {:dev
+             {:main skocko.core/-dev-main}})
+
