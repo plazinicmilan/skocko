@@ -1,0 +1,146 @@
+.images{
+    padding-left: 3px;
+   }
+
+#choose-options{
+    margin-top: 315px;
+    position: absolute;
+    margin-left: 230px;
+}
+
+.imgs{
+    height: 45px;
+    width: 45px;
+}
+
+#main-table{
+    float: left;
+    margin-left: 2%;
+    margin-top: 1%;
+}
+
+#tableskockocheck{
+    margin-top: 1%;
+    position: absolute;
+    margin-left: 245px;
+}
+
+#homep{
+    margin-left: 2%;
+    margin-top: 2%;
+}
+
+#home-page, #result-page{
+    width: 141px;
+}
+
+#delete-sign{
+    float: left;
+    margin-left: 15px;
+    background: #98d9ea;
+    border-radius: 15px;
+    height: 60px;
+    width: 62px;
+}
+
+#ch-signs{
+    float: left;
+    background: #98d9ea;
+    border-radius: 15px;
+    height: 60px;
+    width: 310px;
+}
+
+#ch-signs-buttons{
+    margin-top: 7px;
+    margin-left: 10px;
+}
+
+#delete-sign-button{
+    margin-top: 7px;
+    margin-left: 6px;
+}
+
+#congratulate{
+    background: #98d9ea;
+    width: 640px;
+    border-radius: 40px;
+    height: 200px;
+    position: fixed;
+    margin: 98px 0 0 26%;
+    padding: 20px;
+    z-index: 1500;
+}
+
+#congratulate-background{
+    position: fixed;
+    background: black;
+    height: 900px;
+    width: 100%;
+    top: 0;
+    left: 0;
+    opacity: .5;
+    z-index: 1000;
+    cursor: pointer;
+}
+#congratulate-form{
+    margin-top: 3%;
+    margin-left: 5%;
+}
+
+#cong-left{
+    float: left;
+    width: 325px;
+}
+
+#cong-h1{
+    font-size: 1.5rem;
+}
+
+#save-game{
+    margin-top: 32px;
+    margin-left: 10%;
+    width: 150px;
+}
+
+#resultdatafrm{
+    position: absolute;
+    margin-left: 246px;
+    margin-top: -38px;
+}
+
+#table-show-games{
+    margin-top: 1%;
+    width: 80%;
+    margin-left: 10%;
+    background-color: #98d9ea;
+    border-radius: 30px;
+}
+
+#hp-btn-result{
+    margin-left: 112px;
+}
+
+#result-table{
+    margin-left: 5%;
+    width: 90%;
+}
+
+#table-head th{
+    background-color: #000099;
+}
+
+#game-info {
+    margin-left: 470px;
+    position: absolute;
+    background-color: #98d9ea;
+    border-radius: 20px;
+    height: 120px;
+    width: 250px;
+    margin-top: 16px;
+}
+
+#game-info-data{
+    margin-left: 30px;
+    margin-top: 6px;
+}

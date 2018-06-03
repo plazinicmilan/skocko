@@ -2,15 +2,29 @@
   (:use
     [hiccup.core :refer :all]
     [hiccup.page :refer :all]
-    [compojure.core :refer [defroutes GET]]
+    [hiccup.def :refer :all]
+    [hiccup.util :refer :all]
+    [hiccup.bootstrap.page :refer :all]
+    [hiccup.bootstrap.element :as hbe]
+    [compojure.core :refer [defroutes GET POST]]
     [compojure.route :refer [not-found]]
     [ring.handler.dump :refer [handle-dump]]
+    [ring.util.response :refer [redirect]]
+    [clj-time.format :as f]
     )
   (:require
-    [skocko.database.dbbroker :as db]))
+    [skocko.database.dbbroker :as db]
+    [mikera.image.filters :as filt]
+    [skocko.pages.preview :as page]))
 
 
 (def combination)
+(def finished false)
+(def points)
+(def dok nil)
+(def preview false)
+(def save false)
+(def playername)
 
 (defn check-combination [x0 x1 x2 x3]
   (def result ["" "" "" ""])
@@ -57,193 +71,331 @@
 (defn check-if-fourth [dokum]
   (if (.contains [1 2 3 4 5 6] (/ (count (get dokum "signs")) 4)) true false))
 
-(def choose-table (html  [:table {:id "choose-table" :style "border: 1px solid #000000"}
-                          [:tr
-                           [:td [:form {:id "addPlus" :action "/newGame/+"} [:input {:id "plus" :type "submit" :value "+"}] ]]
-                           [:td [:form {:id "addMinus" :action "/newGame/-"} [:input {:id "minus":type "submit" :value "-"}] ]]
-                           [:td [:form {:id "addStar" :action "/newGame/*"} [:input {:id "star" :type "submit" :value "*"}] ]]
-                           [:td [:form {:id "addDol" :action "/newGame/$"} [:input {:id "dot" :type "submit" :value "$"}] ]]
-                           [:td [:form {:id "addMonkey" :action "/newGame/@"} [:input {:id "monkey" :type "submit" :value "@"}] ]]
-                           [:td [:form {:id "addHash" :action "/newGame/!"} [:input {:id "hash" :type "submit" :value "!"}]]]]]
-                         [:table {:id "remove-element" :style "border: 1px solid #000000"}
-                          [:tr
-                           [:td [:form {:id "removeSign" :action "/newGame/remove"} [:input {:id "remove" :type "submit" :value "X"}]]]]]))
+(def home-page-button (html  [:div {:id "homep"}
+                              [:form {:id "home-page-form" :action "/"}
+                               [:input {:id "home-page" :type "submit" :value "Homepage" :class "btn btn-danger"}]]]))
+(def result-button (html
+                     [:form {:id "resultdatafrm" :action "/results"}
+                      [:input {:id "result-page" :type "submit" :value "Back to results" :class "btn btn-info"}] ]))
 
-(defn table [dok] (try
-                   (html [:table {:id "tableskocko" :style "border: 1px solid #000000"}
-                           [:tr {:id "tr1"}
-                            [:td (nth (get dok "signs") 0 "")]
-                            [:td (nth (get dok "signs") 1 "")]
-                            [:td (nth (get dok "signs") 2 "")]
-                            [:td (nth (get dok "signs") 3 "")]]
-                           [:tr
-                            [:td (nth (get dok "signs") 4 "")]
-                            [:td (nth (get dok "signs") 5 "")]
-                            [:td (nth (get dok "signs") 6 "")]
-                            [:td (nth (get dok "signs") 7 "")]]
-                           [:tr
-                            [:td (nth (get dok "signs") 8 "")]
-                            [:td (nth (get dok "signs") 9 "")]
-                            [:td (nth (get dok "signs") 10 "")]
-                            [:td (nth (get dok "signs") 11 "")]]
-                           [:tr
-                            [:td (nth (get dok "signs") 12 "")]
-                            [:td (nth (get dok "signs") 13 "")]
-                            [:td (nth (get dok "signs") 14 "")]
-                            [:td (nth (get dok "signs") 15 "")]]
-                           [:tr
-                            [:td (nth (get dok "signs") 16 "")]
-                            [:td (nth (get dok "signs") 17 "")]
-                            [:td (nth (get dok "signs") 18 "")]
-                            [:td (nth (get dok "signs") 19 "")]]
-                           [:tr
-                            [:td (nth (get dok "signs") 20 "")]
-                            [:td (nth (get dok "signs") 21 "")]
-                            [:td (nth (get dok "signs") 22 "")]
-                            [:td (nth (get dok "signs") 23 "")]]
-                           ]
-                          )
-                    (catch Exception e
-                      (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e))))))
+(defn empty-player-name []
+  [:label {:for "name-cong" :style"color:red"} [:b "You have to insert your name!"] ]
+  )
+
+(defn congratulate-panel [pts] (html  [:div {:id "congratulate-background"}]
+                                      [:div {:id "congratulate"}
+                                       [:form {:action "/savegame"}
+                                        [:div {:id "congratulate-form"}
+                                         [:h1 {:id "cong-h1"} [:b (if (= 0 points) (html [:p {:style "float: left; padding-right: 8px; color: #000099;"} "Next time will be better!"]
+                                                                                         [:p (str " You won " pts " points.")])
+                                                                                   (html [:p {:style "float: left; padding-right: 8px; color: #218838;"} "Congratulations!"]
+                                                                                         [:p (str " You won " pts " points.")]))]]
+                                         [:div {:id "cong-left" :class "form-group"}
+                                          [:label {:for "name-cong"} [:b "Name:"]]
+                                          [:input {:type "text" :name "playername" :class "form-control" :id "name-cong" :value playername} ]
+                                          (if save (empty-player-name))
+                                          ]
+                                         [:input {:id "save-game" :type "submit" :value "Save game" :class "btn btn-success"}]]]
+                                       ]))
+
+(def choose-table (html [:div {:id "choose-options"}
+                         [:div {:id "ch-signs"}
+                          [:div {:id "ch-signs-buttons"}
+                           [:a {:class "images" :href "/newGame/@"} [:img {:class "imgs" :src "images/smile.png"}]]
+                           [:a {:class "images" :href "/newGame/+"} [:img {:class "imgs" :src "images/karo.png"}]]
+                           [:a {:class "images" :href "/newGame/-"} [:img {:class "imgs" :src "images/tref.png"}]]
+                           [:a {:class "images" :href "/newGame/$"} [:img {:class "imgs" :src "images/srce.png"}]]
+                           [:a {:class "images" :href "/newGame/!"} [:img {:class "imgs" :src "images/pik.png"}]]
+                           [:a {:class "images" :href "/newGame/*"} [:img {:class "imgs" :src "images/zvezda.png"}]]]
+                          ]
+                         [:div {:id "delete-sign"}
+                          [:div {:id "delete-sign-button"}
+                           [:a {:class "images" :href "/newGame/remove"} [:img {:class "imgs" :src "images/remove.png"}]]]]
+                         ]
+
+
+                        ))
+
+(defn get-picture-from-sign [sign]
+  (if (= "" sign) (def slika "images/prazna.png"))
+  (if (= "+" sign) (def slika "images/karo.png"))
+  (if (= "-" sign) (def slika "images/tref.png"))
+  (if (= "*" sign) (def slika "images/zvezda.png"))
+  (if (= "$" sign) (def slika "images/srce.png"))
+  (if (= "@" sign) (def slika "images/smile.png"))
+  (if (= "!" sign) (def slika "images/pik.png"))
+  slika
+  )
+
+
+
+(defn create-table [dok] (try
+                           (html [:table {:id "tableskocko" :style "border: 1px solid #000000"}
+                                  [:tr {:id "tr1"}
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 0 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 1 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 2 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 3 ""))}]]]
+                                  [:tr
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 4 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 5 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 6 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 7 ""))}]]]
+                                  [:tr
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 8 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 9 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 10 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 11 ""))}]]]
+                                  [:tr
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 12 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 13 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 14 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 15 ""))}]]]
+                                  [:tr
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 16 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 17 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 18 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 19 ""))}]]]
+                                  [:tr
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 20 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 21 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 22 ""))}]]
+                                   [:td [:img {:class "imgs" :src (get-picture-from-sign (nth (get dok "signs") 23 ""))}]]]
+                                  ]
+                                 )
+                           (catch Exception e
+                             (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e))))))
+
+(defn get-circle-from-sign [sign]
+  (if (= "" sign) (def slika "images/krug-crni.png"))
+  (if (= "z" sign) (def slika "images/krug-zuti.png"))
+  (if (= "c" sign) (def slika "images/krug-crveni.png"))
+  slika
+  )
 
 (defn correct-answer-table [dokument] (try
-                    (html [:table {:id "tableskockocheck" :style "border: 1px solid #000000"}
+                                        (html [:table {:id "tableskockocheck" :style "border: 1px solid #000000"}
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 0 "")))
-                                    (not (empty? (nth (get dokument "signs") 1 "")))
-                                    (not (empty? (nth (get dokument "signs") 2 "")))
-                                    (not (empty? (nth (get dokument "signs") 3 ""))))
-                             (do (def comb1 (check-combination (nth (get dokument "signs") 0)
-                                                              (nth (get dokument "signs") 1)
-                                                              (nth (get dokument "signs") 2)
-                                                              (nth (get dokument "signs") 3)))
-                                 [:tr
-                                  [:td (nth comb1 0)]
-                                  [:td (nth comb1 1)]
-                                  [:td (nth comb1 2)]
-                                  [:td (nth comb1 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 0 "")))
+                                                        (not (empty? (nth (get dokument "signs") 1 "")))
+                                                        (not (empty? (nth (get dokument "signs") 2 "")))
+                                                        (not (empty? (nth (get dokument "signs") 3 ""))))
+                                                 (do (def comb (check-combination (nth (get dokument "signs") 0)
+                                                                                  (nth (get dokument "signs") 1)
+                                                                                  (nth (get dokument "signs") 2)
+                                                                                  (nth (get dokument "signs") 3)))
+                                                     (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                        (def points 35)))
+                                                     [:tr
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 4 "")))
-                                    (not (empty? (nth (get dokument "signs") 5 "")))
-                                    (not (empty? (nth (get dokument "signs") 6 "")))
-                                    (not (empty? (nth (get dokument "signs") 7 ""))))
-                             (do (def comb2 (check-combination (nth (get dokument "signs") 4)
-                                                              (nth (get dokument "signs") 5)
-                                                              (nth (get dokument "signs") 6)
-                                                              (nth (get dokument "signs") 7)))
-                                 [:tr
-                                  [:td (nth comb2 0)]
-                                  [:td (nth comb2 1)]
-                                  [:td (nth comb2 2)]
-                                  [:td (nth comb2 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 4 "")))
+                                                        (not (empty? (nth (get dokument "signs") 5 "")))
+                                                        (not (empty? (nth (get dokument "signs") 6 "")))
+                                                        (not (empty? (nth (get dokument "signs") 7 ""))))
+                                                 (do (def comb (check-combination (nth (get dokument "signs") 4)
+                                                                                  (nth (get dokument "signs") 5)
+                                                                                  (nth (get dokument "signs") 6)
+                                                                                  (nth (get dokument "signs") 7)))
+                                                     (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                        (def points 30)))
+                                                     [:tr
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 8 "")))
-                                    (not (empty? (nth (get dokument "signs") 9 "")))
-                                    (not (empty? (nth (get dokument "signs") 10 "")))
-                                    (not (empty? (nth (get dokument "signs") 11 ""))))
-                             (do (def comb3 (check-combination (nth (get dokument "signs") 8)
-                                                              (nth (get dokument "signs") 9)
-                                                              (nth (get dokument "signs") 10)
-                                                              (nth (get dokument "signs") 11)))
-                                 [:tr
-                                  [:td (nth comb3 0)]
-                                  [:td (nth comb3 1)]
-                                  [:td (nth comb3 2)]
-                                  [:td (nth comb3 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 8 "")))
+                                                        (not (empty? (nth (get dokument "signs") 9 "")))
+                                                        (not (empty? (nth (get dokument "signs") 10 "")))
+                                                        (not (empty? (nth (get dokument "signs") 11 ""))))
+                                                 (do (def comb (check-combination (nth (get dokument "signs") 8)
+                                                                                  (nth (get dokument "signs") 9)
+                                                                                  (nth (get dokument "signs") 10)
+                                                                                  (nth (get dokument "signs") 11)))
+                                                     (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                        (def points 25)))
+                                                     [:tr
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 12 "")))
-                                    (not (empty? (nth (get dokument "signs") 13 "")))
-                                    (not (empty? (nth (get dokument "signs") 14 "")))
-                                    (not (empty? (nth (get dokument "signs") 15 ""))))
-                             (do
-                               (def comb4 (check-combination (nth (get dokument "signs") 12)
-                                                             (nth (get dokument "signs") 13)
-                                                             (nth (get dokument "signs") 14)
-                                                             (nth (get dokument "signs") 15)))
-                                 [:tr
-                                  [:td (nth comb4 0)]
-                                  [:td (nth comb4 1)]
-                                  [:td (nth comb4 2)]
-                                  [:td (nth comb4 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 12 "")))
+                                                        (not (empty? (nth (get dokument "signs") 13 "")))
+                                                        (not (empty? (nth (get dokument "signs") 14 "")))
+                                                        (not (empty? (nth (get dokument "signs") 15 ""))))
+                                                 (do
+                                                   (def comb (check-combination (nth (get dokument "signs") 12)
+                                                                                (nth (get dokument "signs") 13)
+                                                                                (nth (get dokument "signs") 14)
+                                                                                (nth (get dokument "signs") 15)))
+                                                   (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                      (def points 20)))
+                                                   [:tr
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 16 "")))
-                                    (not (empty? (nth (get dokument "signs") 17 "")))
-                                    (not (empty? (nth (get dokument "signs") 18 "")))
-                                    (not (empty? (nth (get dokument "signs") 19 ""))))
-                             (do
-                               (def comb5 (check-combination (nth (get dokument "signs") 16)
-                                                             (nth (get dokument "signs") 17)
-                                                             (nth (get dokument "signs") 18)
-                                                             (nth (get dokument "signs") 19)))
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 16 "")))
+                                                        (not (empty? (nth (get dokument "signs") 17 "")))
+                                                        (not (empty? (nth (get dokument "signs") 18 "")))
+                                                        (not (empty? (nth (get dokument "signs") 19 ""))))
+                                                 (do
+                                                   (def comb (check-combination (nth (get dokument "signs") 16)
+                                                                                (nth (get dokument "signs") 17)
+                                                                                (nth (get dokument "signs") 18)
+                                                                                (nth (get dokument "signs") 19)))
+                                                   (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                      (def points 15)))
+                                                   [:tr
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                    [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
 
-                               [:tr
-                                [:td (nth comb5 0)]
-                                [:td (nth comb5 1)]
-                                [:td (nth comb5 2)]
-                                [:td (nth comb5 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
+                                               (if (and (not (nil? (get dokument "signs")))
+                                                        (not (empty? (nth (get dokument "signs") 20 "")))
+                                                        (not (empty? (nth (get dokument "signs") 21 "")))
+                                                        (not (empty? (nth (get dokument "signs") 22 "")))
+                                                        (not (empty? (nth (get dokument "signs") 23 ""))))
+                                                 (do (def comb (check-combination (nth (get dokument "signs") 20)
+                                                                                  (nth (get dokument "signs") 21)
+                                                                                  (nth (get dokument "signs") 22)
+                                                                                  (nth (get dokument "signs") 23)))
+                                                     (if (= comb ["c" "c" "c" "c"]) (do (def finished true)
+                                                                                        (def points 10))
+                                                                                    (do (def finished true)
+                                                                                        (def points 0)))
+                                                     [:tr
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 0))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 1))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 2))}]]
+                                                      [:td [:img {:class "imgs" :src (get-circle-from-sign (nth comb 3))}]]])
+                                                 [:tr
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]
+                                                  [:td [:img {:class "imgs" :src (get-circle-from-sign "")}]]])
+                                               ]
+                                              )
+                                        (catch Exception e
+                                          (println e))))
 
-                           (if (and (not (nil? (get dokument "signs")))
-                                    (not (empty? (nth (get dokument "signs") 20 "")))
-                                    (not (empty? (nth (get dokument "signs") 21 "")))
-                                    (not (empty? (nth (get dokument "signs") 22 "")))
-                                    (not (empty? (nth (get dokument "signs") 23 ""))))
-                             (do (def comb6 (check-combination (nth (get dokument "signs") 20)
-                                                              (nth (get dokument "signs") 21)
-                                                              (nth (get dokument "signs") 22)
-                                                              (nth (get dokument "signs") 23)))
-                                 [:tr
-                                  [:td (nth comb6 0)]
-                                  [:td (nth comb6 1)]
-                                  [:td (nth comb6 2)]
-                                  [:td (nth comb6 3)]])
-                             [:tr
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]
-                              [:td ""]])
-                           ]
-                          )
-                    (catch Exception e
-                      (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e))))))
+(def custom-formatter (formatter "dd.MM.yyyy HH:mm"))
+
+(defn show-games [documents]
+  (html
+    [:div {:id "table-show-games"}
+     [:h1 {:style "color: #000099; margin-left: 37%"} [:b "Game results"] ]
+     [:table {:id "result-table" :class "table table-bordered table-hover table-sm"}
+      [:thead {:id "table-head" :class "thead-dark"}
+       [:tr
+        [:th {:scope "col"} "Name"  ]
+        [:th {:scope "col"} "Points"  ]
+        [:th {:scope "col"} "Date" ]
+        [:th {:scope "col"} "Delete game"  ]
+        [:th {:scope "col"} "Show game"]
+        ]]
+
+      (into [:tbody]
+            (try
+              (for [play documents]
+                [:tr {:scope "row"}
+                 [:td (:name play)]
+                 [:td (:points play)]
+                 [:td (if (not (nil? (:date play))) (unparse custom-formatter (:date play)))]
+                 [:td [:a {:href (str "/deleteGame/" (h (:_id play))) :style "color:purple;"}
+                       [:input {:type "submit" :class "btn btn-danger" :value "Delete" :style "width: 100px;"}]]]
+                 [:td [:a {:href (str "/viewGame/" (h (:_id play))) :style "color:purple;"}
+                       [:input {:type "submit" :class "btn btn-info" :value "Show" :style "width: 100px;"}]]]])
+              (catch Exception e
+                [[:b "Dogodila se greska prilikom ucitavanja igara!"]]
+                ;(throw (Exception. e))
+                ))
+            )]
+     [:br]
+     ]))
+
+(defn show-combination [comb]
+  (try
+    (html [:table {:id "tableskockocomb" :style "border: 1px solid #000000; margin-top: 5px;"}
+           [:tr
+            [:td [:img {:class "imgs" :src (get-picture-from-sign (nth comb 0))}]]
+            [:td [:img {:class "imgs" :src (get-picture-from-sign (nth comb 1))}]]
+            [:td [:img {:class "imgs" :src (get-picture-from-sign (nth comb 2))}]]
+            [:td [:img {:class "imgs" :src (get-picture-from-sign (nth comb 3))}]]]]
+          )
+    (catch Exception e
+      (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e)))))
+  )
+
+(defn show-game-info [dokum]
+  (try
+    (println "DATUM" (get dokum "date"))
+    (html [:div {:id "game-info"}
+           [:div {:id "game-info-data"}
+            [:p [:b {:style "color: #000099;"} "Name: "] (get dokum "name")]
+            [:p [:b {:style "color: #000099;"} "Points: "] (get dokum "points")]
+            [:p [:b {:style "color: #000099;"} "Date: "] (unparse custom-formatter (:date dokum))]]
+           ]
+          )
+    (catch Exception e
+      (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e))))))
 
 (defn welcome
   "A ring handler to process all requests sent to the webapp"
   [request]
-  {:status 200
-   :body (html [:h1 {:style "color: green"} "Welcome to Skocko"]
-               [:form {:id "newGameForm" :action "/newGame"} [:input {:type "submit" :value "New game"}] ])
-
-   :headers {}})
+  (try
+    (if (and (not (nil? dok)) (not preview)) (db/delete-game-full-id dok))
+    (def dok nil)
+    (page/pageWelcome "Skočko"
+                      (html [:div {:id "welcome-title"}
+                             [:h1 {:style "color: #000099; margin-left: 13%;"} "Welcome to Skočko"]]
+                            [:div {:id "hp-buttons"}
+                             [:form {:id "newGameForm" :action "/newGame"}
+                              [:input {:type "submit" :value "New game" :class "btn btn-success" :style "width: 150px;"}] ]
+                             [:br]
+                             [:form {:id "reultdataForm" :action "/results"}
+                              [:input {:type "submit" :value "Show results" :class "btn btn-info" :style "width: 150px;"}] ]]
+                            ))
+    (catch Exception e
+      (throw (Exception. e))))
+  )
 
 
 
@@ -261,32 +413,105 @@
   (try
     (def doc (db/find-doc-by-id dok))
     (if (= sign "remove") (if (not (check-if-fourth doc))
-                            (do  (def doc (db/find-doc-by-id dok))
-                                 (db/remove-sign dok (last (get doc "signs")))))
+                            (do (def doc (db/find-doc-by-id dok))
+                                (db/remove-sign dok (last (get doc "signs")))))
                           (db/insert-sign dok sign))
     (def doc (db/find-doc-by-id dok))
     (if (check-if-fourth doc) (do (def answer-table (correct-answer-table doc))
                                   answer-table))
-    (str (table doc) choose-table combination answer-table)
+    (redirect "/newGame")
+    (catch Exception e
+      (throw (Exception. e))))
+  )
+
+(defn save-game [request]
+  (try
+    (def playername (clojure.string/replace (subs (get-in request [:query-string]) 11) "+" " "))
+
+    (if (or (nil? playername) (empty? (clojure.string/trim playername))) (def save true)
+                                                                         (do (db/insert-game-data dok playername points combination)
+                                                                             (def dok nil)
+                                                                             ))
+    (redirect "/newGame")
+    (catch Exception e
+      (throw (Exception. e))))
+  )
+
+(defn get-all-docs []
+  (try
+    (def documents (db/get-all-documents))
+    (page/pageShowResults "Skočko - results"
+                          (str (html [:div {:id "hp-btn-result"} home-page-button] ) (show-games documents)))
+    (catch Exception e
+      (throw (Exception. e))))
+  )
+
+(defn delete-game [id]
+  (try
+    (db/delete-game id)
+    (redirect "/results")
+    (catch Exception e
+      (throw (Exception. e))))
+  )
+
+(defn view-game [id]
+  (try
+    (def dok (db/find-doc-by-full-id id))
+    (def combination [(nth (get dok "combination") 0)
+                      (nth (get dok "combination") 1)
+                      (nth (get dok "combination") 2)
+                      (nth (get dok "combination") 3)])
+    (def answer-table (correct-answer-table dok))
+    (def finished true)
+    (def points (get dok "points"))
+    (def preview true)
+    (redirect "/newGame")
     (catch Exception e
       (throw (Exception. e))))
   )
 
 (defroutes route-defs
-  (GET "/" [] welcome)
-  (GET "/newGame" [] (try
-                       (println "SVeE normaljna")
-                       (def dok (db/create-new-doc) )
-                       (def combination (random-table sign-list))
-                       (def answer-table (correct-answer-table dok))
-                       (str (table "") choose-table combination answer-table)
-                       (catch Exception e)))
-  (GET "/newGame/:sign" [sign] (try
-                                (update-sign dok sign)
+           (GET "/" [] welcome)
+           (GET "/newGame" [] (try
+                                (if (nil? dok) (do (def dok (db/create-new-doc))
+                                                   (def combination (random-table sign-list))
+                                                   (def answer-table (correct-answer-table dok))
+                                                   (def finished false)
+                                                   (def points 0)
+                                                   (def preview false)
+                                                   (def save false)
+                                                   (def playername "")))
+                                (def docc (db/find-doc-by-id dok))
+                                (page/pageNewGame "Skočko - New game"
+                                                  (str home-page-button (if preview result-button)
+                                                       (html [:div {:id "main-table"}
+                                                              (create-table docc)
+                                                              (if finished (show-combination combination))
+                                                              ;(show-combination combination)
+                                                              ]) answer-table
+                                                       (if (not finished) choose-table)
+                                                       (if (and finished (not preview)) (congratulate-panel points))
+                                                       (if preview (show-game-info docc))))
                                 (catch Exception e)))
 
-  (GET "/hello/:name&:surname" [] hello)
-  (not-found "<h1>This is not the page you are looking for</h1>
+           (GET "/newGame/:sign" [sign] (try
+                                          (update-sign dok sign)
+                                          (catch Exception e)))
+           (GET "/savegame" [] (try
+                                 save-game
+                                 (catch Exception e)))
+           (GET "/results" [] (try
+                                (get-all-docs)
+                                (catch Exception e)))
+
+           (GET "/deleteGame/:id" [id] (try
+                                         (delete-game id)
+                                         (catch Exception e)))
+           (GET "/viewGame/:id" [id] (try
+                                       (view-game id)
+                                       (catch Exception e)))
+           (GET "/hello/:name&:surname" [] hello)
+           (not-found "<h1>This is not the page you are looking for</h1>
               <p>Sorry, the page you requested was not found!</p>")
            )
 

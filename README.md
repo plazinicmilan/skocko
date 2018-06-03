@@ -1,14 +1,18 @@
-# skocko
+# skocko-clj
 
-A Clojure library designed to ... well, that part is up to you.
+Clojure game using mongodb.
 
-## Usage
+## Prerequisites
 
-FIXME
+1) You will need [Leiningen][] 2.0.0 or above installed.
+2) You will need running mongodb. In file "skocko.properties" you 
+    can set host, port and db-name.
 
-## License
+[leiningen]: https://github.com/technomancy/leiningen
 
-Copyright © 2018 FIXME
+## Running
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+To start application, from command prompt point to application folder
+ and run:
+
+    lein ring server
