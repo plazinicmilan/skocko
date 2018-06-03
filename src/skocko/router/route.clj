@@ -82,8 +82,9 @@
   [:label {:for "name-cong" :style"color:red"} [:b "You have to insert your name!"] ]
   )
 
-(defn congratulate-panel [pts] (html  [:div {:id "congratulate-background"}]
+(defn congratulate-panel [pts] (html  [:a {:href "/newGameWithoutSaving"} [:div {:id "congratulate-background"}]]
                                       [:div {:id "congratulate"}
+                                       [:a {:id "close-btn" :href "/newGameWithoutSaving"} [:span {:id "close-btn"} "x"]]
                                        [:form {:action "/savegame"}
                                         [:div {:id "congratulate-form"}
                                          [:h1 {:id "cong-h1"} [:b (if (= 0 points) (html [:p {:style "float: left; padding-right: 8px; color: #000099;"} "Next time will be better!"]
@@ -366,7 +367,6 @@
 
 (defn show-game-info [dokum]
   (try
-    (println "DATUM" (get dokum "date"))
     (html [:div {:id "game-info"}
            [:div {:id "game-info-data"}
             [:p [:b {:style "color: #000099;"} "Name: "] (get dokum "name")]
@@ -510,6 +510,12 @@
            (GET "/viewGame/:id" [id] (try
                                        (view-game id)
                                        (catch Exception e)))
+           (GET "/newGameWithoutSaving" [] (try
+                                             (db/delete-game-full-id dok)
+                                         (def dok nil)
+                                         (redirect "/newGame")
+                                       (catch Exception e)))
+
            (GET "/hello/:name&:surname" [] hello)
            (not-found "<h1>This is not the page you are looking for</h1>
               <p>Sorry, the page you requested was not found!</p>")
