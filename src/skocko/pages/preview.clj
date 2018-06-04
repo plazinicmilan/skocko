@@ -15,7 +15,7 @@
       (doctype :html5)
       [:html
        [:head
-        ;[:link {:rel "icon" :href "images/skocko.png"}]
+        [:link {:rel "icon" :href "images/skocko.png"}]
         [:title title]
         (include-css "css/skocko.css")
         (include-css "css/background-game.css")
@@ -28,7 +28,7 @@
       (doctype :html5)
       [:html
        [:head
-        ; [:link {:rel "icon" :href "images/skocko.png"}]
+        [:link {:rel "icon" :href "images/skocko.png"}]
         [:title title]
         (include-css "css/welcomepage.css")
         (include-css "css/background.css")
@@ -41,7 +41,7 @@
       (doctype :html5)
       [:html
        [:head
-        ;  [:link {:rel "icon" :href "images/skocko.png"}]
+        [:link {:rel "icon" :href "images/skocko.png"}]
         [:title title]
         (include-css "css/skocko.css")
         (include-css "css/background.css")
