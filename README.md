@@ -12,7 +12,11 @@ Clojure game using mongodb.
 
 ## Running
 
-To start application, from command prompt point to application folder
+To start application, from command prompt point to application directory
  and run:
 
     lein ring server
+    
+Or if you prefer Docker, you can also point to application directory and run:
+    
+    docker-compose up
