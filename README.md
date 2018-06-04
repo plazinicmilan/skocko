@@ -17,6 +17,6 @@ To start application, from command prompt point to application directory
 
     lein ring server
     
-Or if you prefer Docker (you don't need to set mongodb, it will download automatically) you can also point to application directory and just run:
+Or if you prefer Docker (you don't need to set mongodb, it will download automatically) you can also point to application directory and just run: 
     
     docker-compose up
