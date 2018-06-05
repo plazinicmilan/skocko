@@ -17,7 +17,7 @@
     [mikera.image.filters :as filt]
     [skocko.pages.preview :as page]))
 
-
+(def sign-list ["+" "-" "*" "$" "@" "!"])
 (def combination)
 (def finished false)
 (def points)
@@ -60,8 +60,6 @@
 
   result
   )
-
-(def sign-list ["+" "-" "*" "$" "@" "!"])
 
 (defn random-table [choose-list] [(rand-nth choose-list)
                                   (rand-nth choose-list)
@@ -118,15 +116,14 @@
                         ))
 
 (defn get-picture-from-sign [sign]
-  (if (= "" sign) (def slika "images/prazna.png"))
-  (if (= "+" sign) (def slika "images/karo.png"))
-  (if (= "-" sign) (def slika "images/tref.png"))
-  (if (= "*" sign) (def slika "images/zvezda.png"))
-  (if (= "$" sign) (def slika "images/srce.png"))
-  (if (= "@" sign) (def slika "images/smile.png"))
-  (if (= "!" sign) (def slika "images/pik.png"))
-  slika
-  )
+  (case sign
+    "" "images/prazna.png"
+    "+" "images/karo.png"
+    "-" "images/tref.png"
+    "*" "images/zvezda.png"
+    "$" "images/srce.png"
+    "@" "images/smile.png"
+    "!" "images/pik.png"))
 
 
 
@@ -165,14 +162,13 @@
                                   ]
                                  )
                            (catch Exception e
-                             (throw (Exception. (str "Dogodila se greska prilikom crtanja tabele! " e))))))
+                             (str "Dogodila se greska prilikom crtanja tabele! " e))))
 
 (defn get-circle-from-sign [sign]
-  (if (= "" sign) (def slika "images/krug-crni.png"))
-  (if (= "z" sign) (def slika "images/krug-zuti.png"))
-  (if (= "c" sign) (def slika "images/krug-crveni.png"))
-  slika
-  )
+  (case sign
+    "" "images/krug-crni.png"
+    "z" "images/krug-zuti.png"
+    "c" "images/krug-crveni.png"))
 
 (defn correct-answer-table [dokument] (try
                                         (html [:table {:id "tableskockocheck" :style "border: 1px solid #000000"}
@@ -412,10 +408,14 @@
 (defn update-sign [dok sign]
   (try
     (def doc (db/find-doc-by-id dok))
-    (if (= sign "remove") (if (not (check-if-fourth doc))
-                            (do (def doc (db/find-doc-by-id dok))
-                                (db/remove-sign dok (last (get doc "signs")))))
-                          (db/insert-sign dok sign))
+    (let [doc (db/find-doc-by-id dok)]
+      (case sign
+        "remove" (if (not (check-if-fourth doc))
+                   (db/remove-sign dok (last (get doc "signs"))))
+        (db/insert-sign dok sign))
+
+      )
+
     (def doc (db/find-doc-by-id dok))
     (if (check-if-fourth doc) (do (def answer-table (correct-answer-table doc))
                                   answer-table))
@@ -473,6 +473,7 @@
 (defroutes route-defs
            (GET "/" [] welcome)
            (GET "/newGame" [] (try
+                                (println "BLA BLAHulja")
                                 (if (nil? dok) (do (def dok (db/create-new-doc))
                                                    (def combination (random-table sign-list))
                                                    (def answer-table (correct-answer-table dok))
