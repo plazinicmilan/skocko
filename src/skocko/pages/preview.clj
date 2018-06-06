@@ -3,9 +3,9 @@
     [hiccup.core :refer :all]
     [hiccup.page :refer [doctype include-css]]
     [hiccup.page :refer :all]
-    [hiccup.form :as f]
+    [hiccup.form :refer :all]
     [hiccup.bootstrap.page :refer :all]
-    [hiccup.bootstrap.element :as hbe]
+    [hiccup.bootstrap.element :refer :all]
     [hiccup.element :refer [link-to]]))
 
 

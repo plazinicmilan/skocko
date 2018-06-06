@@ -32,7 +32,6 @@
 (defn create-new-doc []
   (try
     (mc/insert-and-return db table {})
-
     (catch Exception e
       (throw (Exception. "Dogodila se greska prilikom kreiranje novog dokumenta!" e))))
   )
@@ -57,17 +56,23 @@
 
 (defn remove-sign [dok sign]
   (try
-    (def doc (find-doc-by-id dok))
-    (if (or (nil? sign) (empty? sign)) "" (mc/update-by-id db table (get dok :_id) {:signs (drop-last (get doc "signs"))} ))
+    (let [doc (find-doc-by-id dok)]
+      (if (or (nil? sign) (empty? sign)) "" (mc/update-by-id db table (get dok :_id) {:signs (drop-last (get doc "signs"))} )))
     (catch Exception e
       (throw (Exception. "Dogodila se greska prilikom brisanja znaka!" e))))
   )
 
 (defn insert-game-data [dok name points combination]
   (try
-    (def doc (find-doc-by-id dok))
-    (mc/update-by-id db table (get dok :_id) {:name name :points points :signs (get doc "signs") :date (t/from-time-zone (t/now)
-                                                                                                                         (t/time-zone-for-offset -2)) :combination combination}  )
+    (let [doc (find-doc-by-id dok)]
+      (mc/update-by-id db table (get dok :_id) {:name name
+                                                :points points
+                                                :signs (get doc "signs")
+                                                :date (t/from-time-zone (t/now)
+                                                                        (t/time-zone-for-offset -2))
+                                                :combination combination}))
+
+
     (catch Exception e
       (throw (Exception. "Dogodila se greska prilikom inserta podataka o igri!" e))))
   )
